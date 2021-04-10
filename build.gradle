@@ -11,7 +11,7 @@ plugins {
 }
 
 ext {
-    fxyz_sampler_mainClass   = 'org.fxyz3d.samples.Launcher'
+    fxyz_sampler_mainClass   = 'org.fxyz3d.samples.App'
 }
 
 subprojects {
@@ -46,6 +46,12 @@ subprojects {
         testImplementation 'org.junit.jupiter:junit-jupiter-params:5.3.1'
         testImplementation 'org.hamcrest:hamcrest:2.1'
         testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.3.1'
+        
+        	compile "eu.mihosoft.vrl.jcsg:jcsg:0.5.7"
+	compile "commons-io:commons-io:2.2"
+	compile "de.javagl:obj:0.3.0"
+	compile "org.json:json:20170516"
+	compile "org.mapdb:mapdb:3.0.8"
     }
 
     javafx {

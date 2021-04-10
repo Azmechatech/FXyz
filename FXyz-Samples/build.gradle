@@ -37,6 +37,14 @@ dependencies {
     implementation ('org.jfxtras:jfxtras-controls:9.0-r1')
     implementation "org.graalvm.js:js:20.2.0"
     implementation "org.graalvm.js:js-scriptengine:20.2.0"
+
+    compile "eu.mihosoft.vrl.jcsg:jcsg:0.5.7"
+    compile "commons-io:commons-io:2.2"
+    compile "de.javagl:obj:0.3.0"
+    compile "org.json:json:20170516"
+    compile "org.mapdb:mapdb:3.0.8"
+    
+    
 }
 
 compileJava {
