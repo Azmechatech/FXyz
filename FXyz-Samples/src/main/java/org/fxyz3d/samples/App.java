@@ -15,6 +15,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,7 @@ import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SelectionMode;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.input.MouseButton;
@@ -58,11 +60,13 @@ import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Stage;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import org.fxyz3d.shapes.primitives.SpringMesh;
 import org.fxyz3d.utils.CameraTransformer;
 import org.json.JSONObject;
+import org.mapdb.Atomic;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -97,6 +101,7 @@ public class App extends Application {
     public HTreeMap<String, String> store;
     public Map<String, byte[]> sessionStore;
     public BTreeMap<Object[], String> index;
+    Atomic.Var<String> TGAPPKey ;
     int CurrentPageIndex = 0;
 
     @Override
@@ -122,6 +127,8 @@ public class App extends Application {
                 // or use wrapped serializer for specific objects such as String
                 .keySerializer(new SerializerArray(Serializer.STRING))
                 .createOrOpen();//Issue with keys may be...
+        
+        TGAPPKey = db.atomicVar("TGAPPKey",Serializer.STRING).createOrOpen();
 
         PerspectiveCamera camera = new PerspectiveCamera(true);
         camera.setNearClip(0.1);
@@ -298,29 +305,31 @@ public class App extends Application {
 
                 try {
 
-                   
-                String filename="FILE-1610341173973.obj";
-                String metaInfo = HTTPHelper.httpGetResponse("http://www.truegeometry.com/api/get3DAsm?modelName="+filename+"&APIKey=t0UcU+uE8kkV8EiccWpBcSweJbSlyXxy");
-                JSONObject resp = new JSONObject(metaInfo);
-                List<DownloadTask> downloadlist = new LinkedList<>();
-                Set<String> parts = resp.getJSONObject("parts").keySet();
-                TreeItem rootItemC = new TreeItem(filename);
-                
-                for (String key : parts) {
-                    DownloadTask dt = new DownloadTask("http://www.truegeometry.com" + resp.getJSONObject("parts").getString(key) + "&APIKey=t0UcU+uE8kkV8EiccWpBcSweJbSlyXxy", sessionStore, key);
-                    downloadlist.add(dt);
-               
-                    TreeItem thisItem = new TreeItem(key);
- 
-                    rootItemC.getChildren().add(thisItem);
- 
-                }
-                rootItem.getChildren().add(rootItemC);
+                    // create a text input dialog
+                    TextInputDialog td = new TextInputDialog("Enter TG file name");
 
-                new ProgressDialogProd(downloadlist);
- 
-                db.commit();
-                
+                    // setHeaderText
+                    td.setHeaderText("www.truegeometry.com");
+                    td.showAndWait();
+                    String filename = td.getEditor().getText();//"FILE-1609843089509.obj";
+                    String metaInfo = HTTPHelper.httpGetResponse("http://www.truegeometry.com/api/get3DAsm?modelName=" + filename + "&APIKey="+TGAPPKey.get());
+                    JSONObject resp = new JSONObject(metaInfo);
+                    List<DownloadTask> downloadlist = new LinkedList<>();
+                    Set<String> parts = resp.getJSONObject("parts").keySet();
+                    TreeItem rootItemC = new TreeItem(filename);
+
+                    for (String key : parts) {
+                        DownloadTask dt = new DownloadTask("http://www.truegeometry.com" + resp.getJSONObject("parts").getString(key) + "&APIKey="+TGAPPKey.get(), sessionStore, key);
+                        downloadlist.add(dt);
+                        TreeItem thisItem = new TreeItem(key);
+                        rootItemC.getChildren().add(thisItem);
+                    }
+                    rootItem.getChildren().add(rootItemC);
+
+                    new ProgressDialogProd(downloadlist);
+
+                    db.commit();
+
 
                 } catch (MalformedURLException ex) {
                     Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
@@ -331,6 +340,22 @@ public class App extends Application {
             }
         });
 
+        MenuItem TGAPIKey = new MenuItem("Set TG API Key");
+        fileMenu.getItems().addAll(TGAPIKey);
+        TGAPIKey.setOnAction(new EventHandler<ActionEvent>() {
+            public void handle(ActionEvent event) {
+                    // create a text input dialog
+                    TextInputDialog td = new TextInputDialog(TGAPPKey.get()!=null?TGAPPKey.get():"Enter TG API Key");
+                    // setHeaderText
+                    td.setHeaderText("www.truegeometry.com");
+                    td.showAndWait();
+                    String filename = td.getEditor().getText();
+                    TGAPPKey.set(filename);
+                    db.commit();
+            }
+        });
+        
+        
         MenuItem TGCImport = new MenuItem("TG Crossover Import");
         fileMenu.getItems().addAll(TGCImport);
         TGCImport.setOnAction(new EventHandler<ActionEvent>() {
@@ -339,14 +364,14 @@ public class App extends Application {
                     int m1 = 522;
                     int m2 = 311;
                     String fileName = "TGC-"+m1 + "-" + m2;
-                    String metaInfo = HTTPHelper.httpGetResponse("http://www.truegeometry.com/api/transform/model3D?m1=522&m2=311&APIKey=t0UcU+uE8kkV8EiccWpBcSweJbSlyXxy");
+                    String metaInfo = HTTPHelper.httpGetResponse("http://www.truegeometry.com/api/transform/model3D?m1=522&m2=311&APIKey="+TGAPPKey.get());
                     JSONObject resp = new JSONObject(metaInfo);
                     List<DownloadTask> downloadlist = new LinkedList<>();
                     Set<String> parts = resp.keySet();
                     TreeItem rootItemC = new TreeItem(fileName);
 
                     for (String key : parts) {
-                        DownloadTask dt = new DownloadTask("http://www.truegeometry.com" + resp.getString(key) + "&APIKey=t0UcU+uE8kkV8EiccWpBcSweJbSlyXxy", sessionStore, "C" + key);
+                        DownloadTask dt = new DownloadTask("http://www.truegeometry.com" + resp.getString(key) + "&APIKey="+TGAPPKey.get(), sessionStore, "C" + key);
                         downloadlist.add(dt);
                         TreeItem thisItem = new TreeItem("C" + key);
                         rootItemC.getChildren().add(thisItem);
@@ -513,33 +538,65 @@ public class App extends Application {
             }
         });
         
+         Button btnUpload = new Button("Upload Selected");
+        btnUpload.setOnAction(event -> {
+            String selectedItem = (String) listView.getSelectionModel().getSelectedItem();
+            Obj obj = null;
+            if (sessionStore.containsKey(selectedItem)) {
+                try {
+
+                    byte[] objData = sessionStore.get(selectedItem);
+                    ByteArrayInputStream byt = new ByteArrayInputStream(objData);
+ 
+                    String tag = JOptionPane.showInputDialog("Enter tag");
+                    String[] geometryClass = {"Building", "MegaStructures", "Vehicles", "Ships", "Characters", "Aircraft", "Furniture", "Electronics", "Animals", "Plants", "Weapons", "Sports", "Food", "Anatomy", "Other", "OuterSpace"};
+                    JComboBox petList = new JComboBox(geometryClass);
+                    String[] options = {"OK"};
+
+                    int selection = JOptionPane.showOptionDialog(null, petList, "Select Class:",
+                            JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null,
+                            options, options[0]);
+
+                    Object weekday = petList.getSelectedItem();
+                    HashMap<String, String> params = new HashMap<>();
+                    params.put("tags", tag);
+                    params.put("GeometryClass", weekday.toString());
+
+                    String url = "http://www.truegeometry.com";//"http://localhost:8086";//
+                    String APIKey = "t0UcU+uE8kkV8EiccWpBcSweJbSlyXxy";
+                    String jsoKeys = HTTPHelper.httpGetResponse(url + "/getUpldToken?APIKey=" + APIKey);
+                    JSONObject resp = new JSONObject(jsoKeys);
+                    String apiKeyToken = resp.getString("apiKeyToken");
+                    String urlString = url + "/upldAPI?APIKey=" + APIKey + "&APIKeyToken=" + apiKeyToken + "&tags=" + HTTPHelper.encodeValue(tag) + "&GeometryClass=" + weekday.toString();
+
+                    int status = HTTPHelper.uploadFile(urlString, selectedItem, byt, params);
+
+                    int input = JOptionPane.showConfirmDialog(null, "Upload Status" + status, "OK", JOptionPane.OK_OPTION);
+
+                } catch (IOException ex) {
+                    Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        });
+        
         Button btnRefreshSession = new Button("Session Refresh");
-
         btnRefreshSession.setOnAction(event -> {
-
             db.commit();
             listView.getItems().clear();
             sessionStore.keySet().forEach(kv -> {
                 listView.getItems().add(kv);
-            });
-            
-            //SortedList<String> sortedList = new SortedList(listView.getItems());
-            //listView.setItems(sortedList);
-
-    
-             
+            });             
         });
 
         //Reset button
         Button btnResetSession = new Button("Session Reset");
-
         btnResetSession.setOnAction(event -> {
             sessionStore.clear();
             db.commit();
             listView.getItems().clear();
         });
         
-        
+
         treeView.setRoot(rootItem);
         //Action on tree
         treeView.getSelectionModel().selectedItemProperty().addListener(new ChangeListener() {
@@ -552,7 +609,6 @@ public class App extends Application {
                 System.out.println("Selected Text : " + selectedItem.getValue());
 
                 if (selectedItem.isLeaf()) {//If this is leaf node
-
                     try {
                         Obj obj = null;
                         if (sessionStore.containsKey(selectedItem.getValue())) {
@@ -560,23 +616,18 @@ public class App extends Application {
                             ByteArrayInputStream byt = new ByteArrayInputStream(objData);
                             obj = ObjReader.read(byt);
                         } else {
-
                             obj = ObjReader.read(new File(selectedItem.getValue()).toURI().toURL().openStream());
                         }
-
                         CSG objCSG = OBJCSGHelper.toCSG(obj);
                         load(objCSG);
                     } catch (IOException ex) {
                         Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
                     }
-
                 } else {
-
                     if (selectedItem.getParent() != null) {
                         baseObject = null;
                         List<CSG> selectedCSG = new LinkedList<>();
                         selectedItem.getChildren().forEach(child -> {
-
                             try {
                                 Obj obj = null;
                                 if (sessionStore.containsKey(child.getValue())) {
@@ -584,7 +635,6 @@ public class App extends Application {
                                     ByteArrayInputStream byt = new ByteArrayInputStream(objData);
                                     obj = ObjReader.read(byt);
                                 } else {
-
                                     obj = ObjReader.read(new File(child.getValue()).toURI().toURL().openStream());
                                 }
                                 selectedCSG.add(OBJCSGHelper.toCSG(obj));
@@ -593,16 +643,24 @@ public class App extends Application {
                             } catch (IOException ex) {
                                 Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
                             }
-
                         });
 
                         baseObject = selectedCSG.get(0);
-
                         for (int i = 1; i < selectedCSG.size(); i++) {
                             baseObject = baseObject.dumbUnion(selectedCSG.get(i));
                         }
-
+                        
+                        //Views
                         load(baseObject);
+                        
+                        //Cache it 
+                        save(selectedItem.getValue());
+                        
+                        //Refresh view
+                        listView.getItems().clear();
+                        sessionStore.keySet().forEach(kv -> {
+                            listView.getItems().add(kv);
+                        });
 
                     }
 
@@ -614,7 +672,7 @@ public class App extends Application {
          
          
         
-        VBox vBox = new VBox(menuBar, btnRefreshSession,treeView, listView, btnJoin, btnDifference, btnIntersect, btnSave, btnExport, btnResetSession);
+        VBox vBox = new VBox(menuBar, btnRefreshSession,treeView, listView, btnJoin, btnDifference, btnIntersect, btnSave, btnExport,btnUpload, btnResetSession);
         vBox.setPrefWidth(200);
 
         btnRefreshSession.setMinWidth(vBox.getPrefWidth());
@@ -624,6 +682,7 @@ public class App extends Application {
         btnExport.setMinWidth(vBox.getPrefWidth());
         btnResetSession.setMinWidth(vBox.getPrefWidth());
         btnSave.setMinWidth(vBox.getPrefWidth());
+        btnUpload.setMinWidth(vBox.getPrefWidth());
         listView.setMinWidth(vBox.getPrefWidth());
         
         btnRefreshSession.setStyle("  -fx-background-color: \n" +
@@ -674,7 +733,30 @@ public class App extends Application {
 
         viewGroup.getChildren().add(meshView);
     }
+    
+   /**
+    * 
+    * @param keyNameObj 
+    */
+    private void save(String keyNameObj) {
+        //Also cache it
+        try {
+            Obj toSave = OBJCSGHelper.toObj(baseObject);
+            ByteArrayOutputStream stream = new ByteArrayOutputStream();
+            //Also cache it.
+            ObjWriter.write(toSave, stream);
+            String newFileName = keyNameObj;// "CSG-" + System.currentTimeMillis() + ".obj";
+            sessionStore.put(newFileName, stream.toByteArray());
+            db.commit();
 
+        } catch (Exception ex) {
+            Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+        db.commit();
+    }
+    
+    
     public static void main(String[] args) {
         System.out.println("java -Xms6g -Xmx6g -Dprism.order=sw --module-path=\"D:\\DevTools\\openjfx-11.0.2_windows-x64_bin-sdk\\javafx-sdk-11.0.2\\lib\" --add-modules=\"javafx.base,javafx.controls\" -cp TgApp-1.0-SNAPSHOT.jar com.truegeometry.tgapp.App");
         launch();

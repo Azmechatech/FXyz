@@ -11,20 +11,26 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
  * @author ryzen
  */
 public class HTTPHelper {
-    
+
     public static String httpGetResponse(String getURL) throws MalformedURLException, IOException {
 
         URL tgStoreServer = new URL(getURL);
@@ -40,10 +46,17 @@ public class HTTPHelper {
 
         return sb.toString();
     }
-    
-    public static int uploadFile(String upLoadServerUri, File sourceFile, HashMap<String, String> params) {
 
-       // String fileName = sourceFileUri;
+    /**
+     *
+     * @param upLoadServerUri
+     * @param is
+     * @param params
+     * @return
+     */
+    public static int uploadFile(String upLoadServerUri, String filename, InputStream is, HashMap<String, String> params) {
+
+        // String fileName = sourceFileUri;
         HttpURLConnection conn = null;
         DataOutputStream dos = null;
         String lineEnd = "\r\n";
@@ -58,7 +71,7 @@ public class HTTPHelper {
 
         try {
 
-            FileInputStream fileInputStream = new FileInputStream(sourceFile);
+            // FileInputStream fileInputStream = new FileInputStream(sourceFile);
             URL url = new URL(upLoadServerUri);
             //Log.v("joshtag",url.toString());
 
@@ -71,7 +84,7 @@ public class HTTPHelper {
             conn.setRequestProperty("Connection", "Keep-Alive");
             conn.setRequestProperty("ENCTYPE", "multipart/form-data");
             conn.setRequestProperty("Content-Type", "multipart/form-data;boundary=" + boundary);
-            conn.setRequestProperty("file", sourceFile.getName());
+            conn.setRequestProperty("file", filename);
             //conn.setRequestProperty("user", user_id));
 
             dos = new DataOutputStream(conn.getOutputStream());
@@ -82,21 +95,21 @@ public class HTTPHelper {
             }
 
             dos.writeBytes(twoHyphens + boundary + lineEnd);
-            dos.writeBytes("Content-Disposition: form-data; name=\"file\";filename=\"" + sourceFile.getName() + "\"" + lineEnd);
+            dos.writeBytes("Content-Disposition: form-data; name=\"file\";filename=\"" + filename + "\"" + lineEnd);
             dos.writeBytes(lineEnd);
 
             // create a buffer of  maximum size
-            bytesAvailable = fileInputStream.available();
+            bytesAvailable = is.available();
             bufferSize = Math.min(bytesAvailable, maxBufferSize);
             buffer = new byte[bufferSize];
             // read file and write it into form...
-            bytesRead = fileInputStream.read(buffer, 0, bufferSize);
+            bytesRead = is.read(buffer, 0, bufferSize);
 
             while (bytesRead > 0) {
                 dos.write(buffer, 0, bufferSize);
-                bytesAvailable = fileInputStream.available();
+                bytesAvailable = is.available();
                 bufferSize = Math.min(bytesAvailable, maxBufferSize);
-                bytesRead = fileInputStream.read(buffer, 0, bufferSize);
+                bytesRead = is.read(buffer, 0, bufferSize);
                 //Log.i("joshtag","->");
             }
 
@@ -124,7 +137,7 @@ public class HTTPHelper {
             }
 
             //close the streams //
-            fileInputStream.close();
+            is.close();
             dos.flush();
             dos.close();
 
@@ -146,8 +159,8 @@ public class HTTPHelper {
         return serverResponseCode; //after try       
         //END ELSE, if file exists.
     }
-    
-     public static void addFormField(DataOutputStream dos, String parameter, String value) {
+
+    public static void addFormField(DataOutputStream dos, String parameter, String value) {
         try {
             dos.writeBytes(twoHyphens + boundary + lineEnd);
             dos.writeBytes("Content-Disposition: form-data; name=\"" + parameter + "\"" + lineEnd);
@@ -162,5 +175,14 @@ public class HTTPHelper {
     public static String lineEnd = "\r\n";
     public static String twoHyphens = "--";
     public static String boundary = "------------------------afb19f4aeefb356c";
-    
+
+    public static String encodeValue(String value) {
+        try {
+            return URLEncoder.encode(value, StandardCharsets.UTF_8.toString());
+        } catch (UnsupportedEncodingException ex) {
+            Logger.getLogger(HTTPHelper.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return value;
+    }
+
 }
