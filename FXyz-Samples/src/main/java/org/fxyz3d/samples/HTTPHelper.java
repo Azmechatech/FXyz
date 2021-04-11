@@ -79,7 +79,8 @@ public class HTTPHelper {
             conn = (HttpURLConnection) url.openConnection();
             conn.setDoInput(true); // Allow Inputs
             conn.setDoOutput(true); // Allow Outputs
-            conn.setUseCaches(false); // Don't use a Cached Copy            s       
+            conn.setUseCaches(false); // Don't use a Cached Copy            s  
+            //conn.setChunkedStreamingMode(4096);
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Connection", "Keep-Alive");
             conn.setRequestProperty("ENCTYPE", "multipart/form-data");

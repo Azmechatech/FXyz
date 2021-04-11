@@ -15,6 +15,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -102,6 +103,7 @@ public class App extends Application {
     public Map<String, byte[]> sessionStore;
     public BTreeMap<Object[], String> index;
     Atomic.Var<String> TGAPPKey ;
+    Atomic.Var<String> TGServer ;
     int CurrentPageIndex = 0;
 
     @Override
@@ -129,6 +131,9 @@ public class App extends Application {
                 .createOrOpen();//Issue with keys may be...
         
         TGAPPKey = db.atomicVar("TGAPPKey",Serializer.STRING).createOrOpen();
+        TGServer = db.atomicVar("TGServer",Serializer.STRING).createOrOpen();
+        TGServer.set("http://www.truegeometry.com");
+        //TGServer.set("http://localhost:8086");
 
         PerspectiveCamera camera = new PerspectiveCamera(true);
         camera.setNearClip(0.1);
@@ -216,13 +221,13 @@ public class App extends Application {
         button.setOnAction(value -> {
             try {
                 String filename="FILE-1610341173973.obj";
-                String metaInfo = HTTPHelper.httpGetResponse("http://www.truegeometry.com/api/get3DAsm?modelName="+filename+"&APIKey=t0UcU+uE8kkV8EiccWpBcSweJbSlyXxy");
+                String metaInfo = HTTPHelper.httpGetResponse(TGServer.get()+"/api/get3DAsm?modelName="+filename+"&APIKey=t0UcU+uE8kkV8EiccWpBcSweJbSlyXxy");
                 JSONObject resp = new JSONObject(metaInfo);
                 List<DownloadTask> downloadlist = new LinkedList<>();
                 Set<String> parts = resp.getJSONObject("parts").keySet();
                 TreeItem rootItemC = new TreeItem(filename);
                 for (String key : parts) {
-                    DownloadTask dt = new DownloadTask("http://www.truegeometry.com" + resp.getJSONObject("parts").getString(key) + "&APIKey=t0UcU+uE8kkV8EiccWpBcSweJbSlyXxy", sessionStore, key);
+                    DownloadTask dt = new DownloadTask(TGServer.get() + resp.getJSONObject("parts").getString(key) + "&APIKey=t0UcU+uE8kkV8EiccWpBcSweJbSlyXxy", sessionStore, key);
                     downloadlist.add(dt);
                
                     TreeItem thisItem = new TreeItem(key);
@@ -283,10 +288,10 @@ public class App extends Application {
 
                     //Also cache it.
                     ObjWriter.write(obj, stream);
-                    sessionStore.put(objFile.getAbsolutePath(), stream.toByteArray());
+                    sessionStore.put(objFile.getName(), stream.toByteArray());
                     db.commit();
 
-                    listView.getItems().add(objFile.getAbsolutePath());
+                    listView.getItems().add(objFile.getName());
 
                     //reset(new Object3D(ObjUtils.triangulate(obj), true));
                 } catch (MalformedURLException ex) {
@@ -312,14 +317,14 @@ public class App extends Application {
                     td.setHeaderText("www.truegeometry.com");
                     td.showAndWait();
                     String filename = td.getEditor().getText();//"FILE-1609843089509.obj";
-                    String metaInfo = HTTPHelper.httpGetResponse("http://www.truegeometry.com/api/get3DAsm?modelName=" + filename + "&APIKey="+TGAPPKey.get());
+                    String metaInfo = HTTPHelper.httpGetResponse(TGServer.get()+"/api/get3DAsm?modelName=" + filename + "&APIKey="+TGAPPKey.get());
                     JSONObject resp = new JSONObject(metaInfo);
                     List<DownloadTask> downloadlist = new LinkedList<>();
                     Set<String> parts = resp.getJSONObject("parts").keySet();
                     TreeItem rootItemC = new TreeItem(filename);
 
                     for (String key : parts) {
-                        DownloadTask dt = new DownloadTask("http://www.truegeometry.com" + resp.getJSONObject("parts").getString(key) + "&APIKey="+TGAPPKey.get(), sessionStore, key);
+                        DownloadTask dt = new DownloadTask(TGServer.get() + resp.getJSONObject("parts").getString(key) + "&APIKey="+TGAPPKey.get(), sessionStore, key);
                         downloadlist.add(dt);
                         TreeItem thisItem = new TreeItem(key);
                         rootItemC.getChildren().add(thisItem);
@@ -364,14 +369,14 @@ public class App extends Application {
                     int m1 = 522;
                     int m2 = 311;
                     String fileName = "TGC-"+m1 + "-" + m2;
-                    String metaInfo = HTTPHelper.httpGetResponse("http://www.truegeometry.com/api/transform/model3D?m1=522&m2=311&APIKey="+TGAPPKey.get());
+                    String metaInfo = HTTPHelper.httpGetResponse(TGServer.get()+"/api/transform/model3D?m1=522&m2=311&APIKey="+TGAPPKey.get());
                     JSONObject resp = new JSONObject(metaInfo);
                     List<DownloadTask> downloadlist = new LinkedList<>();
                     Set<String> parts = resp.keySet();
                     TreeItem rootItemC = new TreeItem(fileName);
 
                     for (String key : parts) {
-                        DownloadTask dt = new DownloadTask("http://www.truegeometry.com" + resp.getString(key) + "&APIKey="+TGAPPKey.get(), sessionStore, "C" + key);
+                        DownloadTask dt = new DownloadTask(TGServer.get() + resp.getString(key) + "&APIKey="+TGAPPKey.get(), sessionStore, "C" + key);
                         downloadlist.add(dt);
                         TreeItem thisItem = new TreeItem("C" + key);
                         rootItemC.getChildren().add(thisItem);
@@ -546,8 +551,9 @@ public class App extends Application {
                 try {
 
                     byte[] objData = sessionStore.get(selectedItem);
+                    
                     ByteArrayInputStream byt = new ByteArrayInputStream(objData);
- 
+
                     String tag = JOptionPane.showInputDialog("Enter tag");
                     String[] geometryClass = {"Building", "MegaStructures", "Vehicles", "Ships", "Characters", "Aircraft", "Furniture", "Electronics", "Animals", "Plants", "Weapons", "Sports", "Food", "Anatomy", "Other", "OuterSpace"};
                     JComboBox petList = new JComboBox(geometryClass);
@@ -561,17 +567,40 @@ public class App extends Application {
                     HashMap<String, String> params = new HashMap<>();
                     params.put("tags", tag);
                     params.put("GeometryClass", weekday.toString());
-
-                    String url = "http://www.truegeometry.com";//"http://localhost:8086";//
-                    String APIKey = "t0UcU+uE8kkV8EiccWpBcSweJbSlyXxy";
-                    String jsoKeys = HTTPHelper.httpGetResponse(url + "/getUpldToken?APIKey=" + APIKey);
+                    
+                    String jsoKeys = HTTPHelper.httpGetResponse(TGServer.get() + "/getUpldToken?APIKey=" + TGAPPKey.get());
                     JSONObject resp = new JSONObject(jsoKeys);
                     String apiKeyToken = resp.getString("apiKeyToken");
-                    String urlString = url + "/upldAPI?APIKey=" + APIKey + "&APIKeyToken=" + apiKeyToken + "&tags=" + HTTPHelper.encodeValue(tag) + "&GeometryClass=" + weekday.toString();
 
-                    int status = HTTPHelper.uploadFile(urlString, selectedItem, byt, params);
+                    if (objData.length < 1024 * 1024 * 2) { //less than 2MB size
 
-                    int input = JOptionPane.showConfirmDialog(null, "Upload Status" + status, "OK", JOptionPane.OK_OPTION);
+                        String urlString = TGServer.get() + "/upldAPI?APIKey=" + TGAPPKey.get() + "&APIKeyToken=" + apiKeyToken + "&tags=" + HTTPHelper.encodeValue(tag) + "&GeometryClass=" + weekday.toString();
+                        int status = HTTPHelper.uploadFile(urlString, selectedItem, byt, params);
+                        int input = JOptionPane.showConfirmDialog(null, "Upload Status" + status, "OK", JOptionPane.OK_OPTION);
+
+                    } else {
+                        ByteBuffer bb = ByteBuffer.wrap(objData);
+                        int chunkSize=1024 * 1024 * 1;
+                        
+                        for (int i = 0,chunkCOunt=0; i < objData.length; i = i +chunkSize,chunkCOunt++ ) {//Chunk of 1MB
+                            boolean lastChunk=i+chunkSize >= objData.length;
+                            byte[] chunk=new byte[lastChunk?(objData.length-i):chunkSize];
+                            System.out.println("Chunk Sizes: Full>>"+objData.length+" Chunk>> "+ i + " Allocated>>"+chunk.length);
+                            bb.get(chunk, 0, chunk.length);
+                            params.put("chunkLast", String.valueOf(lastChunk));
+                            params.put("chunkSeq",  String.valueOf(chunkCOunt));
+                            params.put("fileName",  selectedItem);
+ 
+                            String urlString = TGServer.get() + "/upldChunkAPI?APIKey=" + TGAPPKey.get() + "&APIKeyToken=" + apiKeyToken +
+                                    "&tags=" + HTTPHelper.encodeValue(tag) 
+                                    + "&GeometryClass=" + weekday.toString()
+                                    + "&chunkLast="+String.valueOf(lastChunk)
+                                    +"&chunkSeq="+String.valueOf(chunkCOunt)
+                                    +"&fileName="+selectedItem;
+                            int status = HTTPHelper.uploadFile(urlString, selectedItem,  new ByteArrayInputStream(chunk), params);
+                        }
+
+                    }
 
                 } catch (IOException ex) {
                     Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
