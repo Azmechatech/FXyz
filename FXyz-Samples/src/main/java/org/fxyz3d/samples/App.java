@@ -220,14 +220,14 @@ public class App extends Application {
 
         button.setOnAction(value -> {
             try {
-                String filename="FILE-1610341173973.obj";
-                String metaInfo = HTTPHelper.httpGetResponse(TGServer.get()+"/api/get3DAsm?modelName="+filename+"&APIKey=t0UcU+uE8kkV8EiccWpBcSweJbSlyXxy");
+                String filename="test.obj";
+                String metaInfo = HTTPHelper.httpGetResponse(TGServer.get()+"/api/get3DAsm?modelName="+filename+"&APIKey="+TGAPPKey.toString());
                 JSONObject resp = new JSONObject(metaInfo);
                 List<DownloadTask> downloadlist = new LinkedList<>();
                 Set<String> parts = resp.getJSONObject("parts").keySet();
                 TreeItem rootItemC = new TreeItem(filename);
                 for (String key : parts) {
-                    DownloadTask dt = new DownloadTask(TGServer.get() + resp.getJSONObject("parts").getString(key) + "&APIKey=t0UcU+uE8kkV8EiccWpBcSweJbSlyXxy", sessionStore, key);
+                    DownloadTask dt = new DownloadTask(TGServer.get() + resp.getJSONObject("parts").getString(key) + "&APIKey="+TGAPPKey.toString(), sessionStore, key);
                     downloadlist.add(dt);
                
                     TreeItem thisItem = new TreeItem(key);
@@ -236,7 +236,7 @@ public class App extends Application {
                 }
                 rootItem.getChildren().add(rootItemC);
 
-                new ProgressDialogProd(downloadlist);
+                new ProgressDialogProd(downloadlist, true);
                 
                             
              
@@ -303,6 +303,46 @@ public class App extends Application {
             }
         });
 
+        MenuItem TGUnprocImport = new MenuItem("TG Preview Import");
+        fileMenu.getItems().addAll(TGUnprocImport);
+        TGUnprocImport.setOnAction(new EventHandler<ActionEvent>() {
+            public void handle(ActionEvent event) {
+
+                try {
+
+                    // create a text input dialog
+                    TextInputDialog td = new TextInputDialog("Enter TG file name");
+
+                    // setHeaderText
+                    td.setHeaderText("www.truegeometry.com");
+                    td.showAndWait();
+                    String filename = td.getEditor().getText();//"FILE-1609843089509.obj";
+                    String metaInfo = HTTPHelper.httpGetResponse(TGServer.get()+"/api/unp3DAsm?modelName=" + filename + "&APIKey="+TGAPPKey.get());
+                     JSONObject resp = new JSONObject(metaInfo);
+                    List<DownloadTask> downloadlist = new LinkedList<>();
+                    Set<String> parts = resp.keySet();
+                    TreeItem rootItemC = new TreeItem(filename);
+
+                    for (String key : parts) {
+                        DownloadTask dt = new DownloadTask(TGServer.get() + resp.getString(key) + "&APIKey="+TGAPPKey.get(), sessionStore, "P" + key);
+                        downloadlist.add(dt);
+                        TreeItem thisItem = new TreeItem("P" + key);
+                        rootItemC.getChildren().add(thisItem);
+                    }
+                    rootItem.getChildren().add(rootItemC);
+
+                    new ProgressDialogProd(downloadlist, true);
+                    db.commit();
+
+                } catch (MalformedURLException ex) {
+                    Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (IOException ex) {
+                    Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+                }
+
+            }
+        });
+        
         MenuItem TGImport = new MenuItem("TG Assembly Import");
         fileMenu.getItems().addAll(TGImport);
         TGImport.setOnAction(new EventHandler<ActionEvent>() {
@@ -331,7 +371,7 @@ public class App extends Application {
                     }
                     rootItem.getChildren().add(rootItemC);
 
-                    new ProgressDialogProd(downloadlist);
+                    new ProgressDialogProd(downloadlist, true);
 
                     db.commit();
 
@@ -383,7 +423,7 @@ public class App extends Application {
                     }
                     rootItem.getChildren().add(rootItemC);
 
-                    new ProgressDialogProd(downloadlist);
+                    new ProgressDialogProd(downloadlist, true);
                     db.commit();
 
                 } catch (MalformedURLException ex) {
@@ -572,16 +612,19 @@ public class App extends Application {
                     JSONObject resp = new JSONObject(jsoKeys);
                     String apiKeyToken = resp.getString("apiKeyToken");
 
-                    if (objData.length < 1024 * 1024 * 2) { //less than 2MB size
-
-                        String urlString = TGServer.get() + "/upldAPI?APIKey=" + TGAPPKey.get() + "&APIKeyToken=" + apiKeyToken + "&tags=" + HTTPHelper.encodeValue(tag) + "&GeometryClass=" + weekday.toString();
-                        int status = HTTPHelper.uploadFile(urlString, selectedItem, byt, params);
-                        int input = JOptionPane.showConfirmDialog(null, "Upload Status" + status, "OK", JOptionPane.OK_OPTION);
-
-                    } else {
+//                    if (objData.length < 1024 * 1024 * 2) { //less than 2MB size
+//
+//                        String urlString = TGServer.get() + "/upldAPI?APIKey=" + TGAPPKey.get() + "&APIKeyToken=" + apiKeyToken + "&tags=" + HTTPHelper.encodeValue(tag) + "&GeometryClass=" + weekday.toString();
+//                        int status = HTTPHelper.uploadFile(urlString, selectedItem, byt, params);
+//                        int input = JOptionPane.showConfirmDialog(null, "Upload Status" + status, "OK", JOptionPane.OK_OPTION);
+//
+//                    } else 
+                    {
                         ByteBuffer bb = ByteBuffer.wrap(objData);
                         int chunkSize=1024 * 1024 * 1;
                         
+                         List<DownloadTask> downloadlist = new LinkedList<>();
+                         
                         for (int i = 0,chunkCOunt=0; i < objData.length; i = i +chunkSize,chunkCOunt++ ) {//Chunk of 1MB
                             boolean lastChunk=i+chunkSize >= objData.length;
                             byte[] chunk=new byte[lastChunk?(objData.length-i):chunkSize];
@@ -598,7 +641,10 @@ public class App extends Application {
                                     +"&chunkSeq="+String.valueOf(chunkCOunt)
                                     +"&fileName="+selectedItem;
                             int status = HTTPHelper.uploadFile(urlString, selectedItem,  new ByteArrayInputStream(chunk), params);
+                            //downloadlist.add(new DownloadTask(urlString, tag, byt, params));
                         }
+                       // new ProgressDialogProd(downloadlist, false);
+                         int input = JOptionPane.showConfirmDialog(null, "Uploaded", "OK", JOptionPane.PLAIN_MESSAGE);
 
                     }
 

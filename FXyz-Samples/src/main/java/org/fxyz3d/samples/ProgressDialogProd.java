@@ -31,10 +31,10 @@ public class ProgressDialogProd {
     
     
     public static void main(String[] args) {
-        new ProgressDialogProd(new ArrayList<DownloadTask>());
+        new ProgressDialogProd(new ArrayList<DownloadTask>(), true);
     }
 
-    public ProgressDialogProd(List<DownloadTask> downloadTaskList) {
+    public ProgressDialogProd(List<DownloadTask> downloadTaskList, boolean download) {
         EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
@@ -48,7 +48,11 @@ public class ProgressDialogProd {
                     protected Object doInBackground() throws Exception {
                         for (int index = 0; index < downloadTaskList.size(); index++) {
                             
-                            String response=downloadTaskList.get(index).download();
+                            if (download)
+                                downloadTaskList.get(index).download();
+                            else
+                                downloadTaskList.get(index).streamUpload();
+                            
                             setProgress(index);
                         }
                         return null;
